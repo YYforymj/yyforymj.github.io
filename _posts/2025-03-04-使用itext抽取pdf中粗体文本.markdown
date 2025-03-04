@@ -1,0 +1,130 @@
+---
+
+layout: post
+title:  "使用itext抽取pdf中粗体文本"
+date:   2025-03-04 10:55:57 +0800
+categories: 日常工作
+
+---
+
+### 起因
+
+业务人员提了个需求，希望能够上传一份pdf，然后程序识别其中的某些文本，存储到数据库中使用，其中部分文本需要抓取粗体的文本。
+
+### 尝试
+
+上网搜索了一下，发现 java 开源库识别 pdf 主要的有两个：Apache 的 pdfbox 与 itext-pdf。其中 pdfbox 尝试了下无法直接识别 word 中加粗转到 PDF 文件之后的粗体文本（网上都是说使用字体中是否包含 “bold” 字符或者 “bold” 属性，但是这两个在这种情境下都没法用）。使用 itext-pdf 测试了下，通过 strike 属性是可以获取到是否加粗的，记录如下。
+
+### 引入依赖
+
+maven 项目在 `pom.xml`中添加如下依赖
+
+```
+		<dependency>
+			<groupId>com.itextpdf</groupId>
+			<artifactId>itextpdf</artifactId>
+			<version>5.5.13.2</version>
+		</dependency>
+```
+
+### 测试代码
+
+itext-pdf 对于每个文本，都会记录一个属性 `textRenderMode`其可能值如下：
+
+```
+0 = Fill text
+1 = Stroke text
+2 = Fill, then stroke text
+3 = Invisible
+4 = Fill text and add to path for clipping
+5 = Stroke text and add to path for clipping
+6 = Fill, then stroke text and add to path for clipping
+7 = Add text to padd for clipping
+```
+
+当值为1时为粗体文本，2时为先填充后加粗，根据这两个值判断即可。
+
+下面是解析工具类，其中`renderText`函数会在读取每段字符的时候调用，判断`textRenderMode`即可。在循环过程中，如果遇到粗体则将其放到缓存中；粗体结束则将缓存中文本连接在一起并记录第一个字符串的位置坐标方便后续判断使用。
+
+```
+   
+    // 自定义文本解析器，用于检测粗体文本等
+	static class PdfTextRenderListener implements RenderListener {
+		//读取到的单个字符，包含位置信息等
+		private List<TextRenderInfo> boldTextTmpList = new ArrayList<>();
+		//加粗字符串，key是字符串，value是第一个字符的位置信息
+		private List<Map<String, TextRenderInfo>> boldTextMapList = new ArrayList<>();
+
+		@Override
+		public void beginTextBlock() {
+		}
+
+		@Override
+		public void renderText(TextRenderInfo renderInfo) {
+			//过滤空白字符
+			if (StrUtil.isBlank(renderInfo.getText())) {
+				return;
+			}
+			//过滤页眉页脚
+			//页眉y坐标 775.92
+			//页脚y坐标 45.84
+			// log.info(renderInfo.getText() + " " + renderInfo.getTextRenderMode() + " " + renderInfo.getBaseline().getStartPoint());
+			if (renderInfo.getBaseline().getStartPoint().get(1) > 760 ||
+					renderInfo.getBaseline().getStartPoint().get(1) < 70) {
+				return;
+			}
+			// 获取文本是否加粗
+			// log.info(renderInfo.getText() + " " + renderInfo.getTextRenderMode());
+			if (renderInfo.getTextRenderMode() == 2 || renderInfo.getTextRenderMode() == 1) {
+				// 累加粗体文本
+				boldTextTmpList.add(renderInfo);
+			} else {
+				if (boldTextTmpList.size() > 0) {
+					//遇到非粗体，合并粗体文本到一个字符串
+					String currentBoldText = boldTextTmpList.stream().map(TextRenderInfo::getText).collect(Collectors.joining());
+					//map的key存放字符串，value存放该字符串第一个文本的页面位置
+					Map<String, TextRenderInfo> textMap = new HashMap<>();
+					textMap.put(currentBoldText, boldTextTmpList.get(0));
+					boldTextMapList.add(textMap);
+					//清空字符缓存
+					boldTextTmpList.clear();
+				}
+			}
+		}
+
+		public List<Map<String, TextRenderInfo>> getBoldTextPositionList() {
+			//getBoldTextList在当页结束后需要调用
+			//如果粗体在当页的最后，也要累加一下
+			if (boldTextTmpList.size() > 0) {
+				String currentBoldText = boldTextTmpList.stream().map(TextRenderInfo::getText).collect(Collectors.joining());
+				Map<String, TextRenderInfo> textMap = new HashMap<>();
+				textMap.put(currentBoldText, boldTextTmpList.get(0));
+				boldTextMapList.add(textMap);
+			}
+			return boldTextMapList;
+		}
+
+		@Override
+		public void endTextBlock() {
+		}
+
+		@Override
+		public void renderImage(ImageRenderInfo renderInfo) {}
+	}
+```
+
+最后是调用的测试方法，调用完成后`boldTextMapList` 即存储了所有的加粗字符串与位置信息。
+
+```
+// 加载PDF文件
+PdfReader reader = new PdfReader(is);
+PdfReaderContentParser parser = new PdfReaderContentParser(reader);
+// 遍历每一页
+List<Map<String, TextRenderInfo>> boldTextMapList = new ArrayList<>();
+StringBuilder evaluation = new StringBuilder();
+for (int i = 1; i <= reader.getNumberOfPages(); i++) {
+	PdfTextRenderListener strategy = parser.processContent(i, new PdfTextRenderListener());
+	//获取每一页加粗的字符串与位置列表
+	boldTextMapList.addAll(strategy.getBoldTextPositionList());
+}
+```
