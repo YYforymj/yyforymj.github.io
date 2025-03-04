@@ -14,6 +14,8 @@ categories: 日常工作
 ### 尝试
 
 上网搜索了一下，发现 java 开源库识别 pdf 主要的有两个：Apache 的 pdfbox 与 itext-pdf。其中 pdfbox 尝试了下无法直接识别 word 中加粗转到 PDF 文件之后的粗体文本（网上都是说使用字体中是否包含 “bold” 字符或者 “bold” 属性，但是这两个在这种情境下都没法用）。使用 itext-pdf 测试了下，通过 strike 属性是可以获取到是否加粗的，记录如下。
+![加粗文本示例](https://github.com/YYforymj/yyforymj.github.io/raw/main/pictures/2025-03-04-使用itext抽取pdf中粗体文本-pdf粗体文本.png)
+
 
 ### 引入依赖
 
