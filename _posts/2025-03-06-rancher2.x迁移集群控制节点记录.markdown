@@ -30,9 +30,8 @@ categories: 日常工作
 4. rancher 内部署的镜像来自内网的 harbor 仓库，harbor 仓库的 ip 可以使用内网 ip 拉取避免走外网占用外网带宽的同时内网带宽更大拉取速度更快。
 
 5. 被控制的的集群节点在拉取 harbor 仓库镜像的时候，由于 harbor 仓库是新部署的，需要在被控制集群的 docker 配置文件 `docker-daemon.json`中 `insecure-registries` 配置项里增加新仓库地址，之后还要重启 docker 使配置文件生效。
-
-``````
-sudo systemctl daemon-reload
-sudo systemctl restart docker
-``````
-6. 如果rancher控制节点安装之后有问题需要重新安装，则需要在启动之前参考 [清理节点文档](https://docs.rancher.cn/docs/rancher2.5/cluster-admin/cleaning-cluster-nodes/_index/)，先对rancher控制节点清理，然后在重新安装即可。
+   ``````
+   sudo systemctl daemon-reload
+   sudo systemctl restart docker
+   ``````
+7. 如果rancher控制节点安装之后有问题需要重新安装，则需要在启动之前参考 [清理节点文档](https://docs.rancher.cn/docs/rancher2.5/cluster-admin/cleaning-cluster-nodes/_index/)，先对rancher控制节点清理，然后在重新安装即可。
