@@ -1,0 +1,38 @@
+---
+
+layout: post
+title:  "rancher2.x迁移集群控制节点记录"
+date:   2025-03-06 10:48:00 +0800
+categories: 日常工作
+
+---
+
+### 起因
+
+公司测试环境有两台服务器到期了，需要迁移到新账号的服务器下面。
+
+### 准备工作
+
+需要先在两个腾讯云账号之间开通对等连接，并且按照对等连接的说明分配好 ip 打通内网。由于 rancher 版本比较低，且是单节点部署，找了下官方文档，没有直接的迁移文档，但是在微信公众号上找到了一篇文章讲解低版本（2.x）单节点迁移，故参考操作 https://mp.weixin.qq.com/s/b8iIVKfpr6jHjeK2620eug。
+
+### 迁移过程一些细节
+
+基本就是按照上述文章的操作过程，操作还是很顺利的。但是因为个人的一些操作导致有一些问题记录如下：
+
+1. 一开始以为原有的控制节点是用的自生成证书，导致先自签了一个证书。后面在操作过程中发现原有的 rancher 控制节点的容器并没有挂载外部磁盘，也就是说用的是 rancher 自动生成的证书。使用的自动生成的证书不再需要自己签名的证书，但是需要每年更新一遍 rancher 内的自动生成的证书。
+
+2. 添加主机命令时，由于单节点部署需要把主机选项下面的 `etcd`、`control`、`worker`角色都勾选上。
+
+3. `使用kubectl工具，通过前文中准备的直连kubeconfig配置文件和上面步骤中获取的 YAML 文件，执行以下命令更新agent相关配置。`这里操作的时候，直接在新的rancher界面上点击如下按钮并粘贴命令即可。
+
+   ![kubectl按钮位置](https://github.com/YYforymj/yyforymj.github.io/raw/main/pictures/2025-03-06-rancher迁移控制节点-执行kubectl命令按钮位置.png)
+
+4. rancher 内部署的镜像来自内网的 harbor 仓库，harbor 仓库的 ip 可以使用内网 ip 拉取避免走外网占用外网带宽的同时内网带宽更大拉取速度更快。
+
+5. 被控制的的集群节点在拉取 harbor 仓库镜像的时候，由于 harbor 仓库是新部署的，需要在被控制集群的 docker 配置文件 `docker-daemon.json`中 `insecure-registries` 配置项里增加新仓库地址，之后还要重启 docker 使配置文件生效。
+
+``````
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+``````
+
