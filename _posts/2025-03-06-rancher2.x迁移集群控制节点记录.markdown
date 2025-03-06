@@ -35,4 +35,4 @@ categories: 日常工作
 sudo systemctl daemon-reload
 sudo systemctl restart docker
 ``````
-
+6. 如果rancher控制节点安装之后有问题需要重新安装，则需要在启动之前参考 [清理节点文档](https://docs.rancher.cn/docs/rancher2.5/cluster-admin/cleaning-cluster-nodes/_index/)，先对rancher控制节点清理，然后在重新安装即可。
